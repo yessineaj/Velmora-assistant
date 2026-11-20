@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Velmora help assistant</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1c2430; --muted:#6b7686; --accent:#0f766e; --warn:#b45309; --line:#e3e7ee; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161c; --card:#1b212b; --ink:#e8edf4; --muted:#93a0b3; --accent:#2dd4bf; --warn:#f59e0b; --line:#2a3240; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink);
+         display:flex; flex-direction:column; height:100vh }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); background:var(--card) }
+  header b { color:var(--accent) } header small { color:var(--muted); margin-left:8px }
+  #chat { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:12px; max-width:760px; width:100%; margin:0 auto }
+  .msg { padding:12px 14px; border-radius:12px; max-width:88%; white-space:pre-wrap; border:1px solid var(--line) }
+  .user { align-self:flex-end; background:var(--accent); color:#fff; border-color:transparent }
+  .bot { align-self:flex-start; background:var(--card) }
+  .bot.unknown { border-left:4px solid var(--warn) }
+  .meta { margin-top:8px; font-size:13px; color:var(--muted) }
+  .meta span { display:inline-block; background:var(--bg); border:1px solid var(--line); border-radius:999px; padding:1px 9px; margin:2px 4px 0 0 }
+  .note { color:var(--warn) }
+  form { display:flex; gap:8px; padding:14px 20px; border-top:1px solid var(--line); background:var(--card) }
+  form > div { display:flex; gap:8px; max-width:760px; width:100%; margin:0 auto }
+  input { flex:1; padding:11px 14px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font:inherit }
+  button { padding:0 18px; border:0; border-radius:10px; background:var(--accent); color:#fff; font:inherit; cursor:pointer }
+  button:disabled { opacity:.5 }
+  .hint { color:var(--muted); font-size:14px }
+</style>
+</head>
+<body>
+<header><b>Velmora</b> help assistant <small>answers come only from the help center</small></header>
+<main id="chat">
+  <div class="msg bot">Hi! Ask me about orders, delivery, payment, returns or your account.
+    <div class="hint">Try: &laquo;How much does Express delivery cost?&raquo;</div></div>
+</main>
+<form id="f"><div>
+  <input id="q" autocomplete="off" maxlength="500" placeholder="Type your question&hellip;" autofocus>
+  <button id="send">Send</button>
+</div></form>
+<script>
+const chat = document.getElementById('chat'), q = document.getElementById('q'), btn = document.getElementById('send');
+function add(text, cls) { const d = document.createElement('div'); d.className = 'msg ' + cls; d.textContent = text; chat.appendChild(d); chat.scrollTop = chat.scrollHeight; return d; }
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = q.value.trim(); if (!text) return;
+  add(text, 'user'); q.value = ''; btn.disabled = true;
+  try {
+    const r = await fetch('/api/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question:text}) });
+    const d = await r.json();
+    if (!r.ok) { add(d.error || 'Error', 'bot unknown'); return; }
+    const m = add(d.answer, 'bot' + (d.answerable ? '' : ' unknown'));
+    if (d.answerable) {
+      const meta = document.createElement('div'); meta.className = 'meta';
+      d.sources.forEach(s => { const sp = document.createElement('span'); sp.textContent = s.id + ' · ' + s.title + ' · updated ' + s.updated; meta.appendChild(sp); });
+      d.notes.forEach(n => { const p = document.createElement('div'); p.className = 'note'; p.textContent = n; meta.appendChild(p); });
+      m.appendChild(meta);
+    }
+  } catch (err) { add('Network error, please try again.', 'bot unknown'); }
+  finally { btn.disabled = false; q.focus(); }
+});
+</script>
+</body>
+</html>
